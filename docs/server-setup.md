@@ -63,3 +63,24 @@
 - `01-clean-install` — исходное состояние после установки ОС Ubuntu 24.04 и обновления пакетов.
 - `02-keys-configured` — создана учетная запись `devops`, настроена беспарольная аутентификация по ключу Ed25519, проверены права 700/600, настроен `~/.ssh/config` на хосте.
 - `03-ssh-hardened` — выполнен харденинг SSH (порт 2222, отключен root и пароли), актуализирован проброс портов VirtualBox, настроен UFW.
+
+## 8. Веб-сервер
+- Устанавливаемый пакет: `nginx` (версия 1.24.0 из стандартных репозиториев Ubuntu 24.04).
+- Путь к конфигурационному файлу ресурса:
+  - Основной файл: `/etc/nginx/sites-available/devops-site`
+  - Символическая ссылка активации: `/etc/nginx/sites-enabled/devops-site`
+  - Стандартный ресурс отключен: ссылка `/etc/nginx/sites-enabled/default` удалена.
+- Каталог публикуемого ресурса: `/var/www/devops-site`
+  - Владелец и группа: `devops:devops`
+  - Права каталога: `755` (`drwxr-xr-x`)
+  - Права файлов (`index.html`, `404.html`): `644` (`-rw-r--r--`)
+- Пути к ключевому материалу TLS:
+  - Сертификат: `/etc/ssl/certs/devops.crt` (права `644`, владелец `root:root`)
+  - Закрытый ключ: `/etc/ssl/private/devops.key` (права `600`, владелец `root:root`)
+- Команда формирования самоподписанного сертификата:
+  ```bash
+  sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout /etc/ssl/private/devops.key \
+    -out /etc/ssl/certs/devops.crt \
+    -subj "/CN=devops.local" \
+    -addext "subjectAltName=DNS:devops.local"
