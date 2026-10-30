@@ -70,5 +70,36 @@ else
 fi
 check "Безопасность файлов (нет world-writable и права ключа 600)" "secure" "$SECURITY_CHECK"
 
+echo "[5] Контейнеризация"
+# а) служба docker активна
+check "Служба docker активна" "active" "$(systemctl is-active docker 2>/dev/null || echo 'inactive')"
+
+# б) контейнер СУБД находится в состоянии healthy
+DB_CONTAINER="$(docker ps -aq -f "name=app-db-1" 2>/dev/null || true)"
+if [[ -n "$DB_CONTAINER" ]]; then
+    DB_HEALTH="$(docker inspect -f '{{.State.Health.Status}}' app-db-1 2>/dev/null || echo 'unknown')"
+else
+    DB_HEALTH="not_found"
+fi
+check "Контейнер СУБД app-db-1 в состоянии healthy" "healthy" "$DB_HEALTH"
+
+# в) порты 5000 и 5432 не прослушиваются ни на одном адресе, кроме 127.0.0.1
+INSECURE_PORTS="$(ss -tln 2>/dev/null | awk '{print $4}' | grep -E ':(5000|5432)$' | grep -v '127.0.0.1' | tr '\n' ' ')"
+if [[ -z "${INSECURE_PORTS// /}" ]]; then
+    PORTS_STATUS="secure"
+else
+    PORTS_STATUS="insecure: $INSECURE_PORTS"
+fi
+check "Порты 5000 и 5432 изолированы (только 127.0.0.1)" "secure" "$PORTS_STATUS"
+
+# г) права файла ~/app/.env равны 600
+ENV_FILE="${HOME}/app/.env"
+if [[ -f "$ENV_FILE" ]]; then
+    ENV_PERM="$(stat -c '%a' "$ENV_FILE" 2>/dev/null || echo 'none')"
+else
+    ENV_PERM="missing"
+fi
+check "Права файла ~/app/.env равны 600" "600" "$ENV_PERM"
+
 echo "Пройдено: $PASS, не пройдено: $FAIL"
 [[ $FAIL -eq 0 ]] && exit 0 || exit 1
